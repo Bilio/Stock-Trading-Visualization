@@ -15,7 +15,7 @@ df = df.sort_values('Date')
 env = DummyVecEnv([lambda: StockTradingEnv(df)])
 
 model = PPO2(MlpPolicy, env, verbose=1)
-model.learn(total_timesteps=3000)
+model.learn(total_timesteps=500000)
 
 obs = env.reset()
 for i in range(len(df['Date'])):

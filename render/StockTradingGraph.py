@@ -21,8 +21,8 @@ DOWN_TEXT_COLOR = '#DC2C27'
 
 
 def date2num(date):
-    converter = mdates.strpdate2num('%Y-%m-%d')
-    return converter(date)
+    converter = mdates.datestr2num(date)
+    return converter
 
 
 class StockTradingGraph:
@@ -87,16 +87,16 @@ class StockTradingGraph:
 
         # Format data for OHCL candlestick graph
         candlesticks = zip(dates,
-                           self.df['Open'].values[step_range], self.df['Close'].values[step_range],
-                           self.df['High'].values[step_range], self.df['Low'].values[step_range])
+                           self.df['open'].values[step_range], self.df['close'].values[step_range],
+                           self.df['high'].values[step_range], self.df['low'].values[step_range])
 
         # Plot price using candlestick graph from mpl_finance
         candlestick(self.price_ax, candlesticks, width=1,
                     colorup=UP_COLOR, colordown=DOWN_COLOR)
 
         last_date = date2num(self.df['Date'].values[current_step])
-        last_close = self.df['Close'].values[current_step]
-        last_high = self.df['High'].values[current_step]
+        last_close = self.df['close'].values[current_step]
+        last_high = self.df['high'].values[current_step]
 
         # Print the current price to the price axis
         self.price_ax.annotate('{0:.2f}'.format(last_close), (last_date, last_close),
@@ -114,12 +114,12 @@ class StockTradingGraph:
     def _render_volume(self, current_step, net_worth, dates, step_range):
         self.volume_ax.clear()
 
-        volume = np.array(self.df['Volume'].values[step_range])
+        volume = np.array(self.df['volumefrom'].values[step_range])
 
-        pos = self.df['Open'].values[step_range] - \
-            self.df['Close'].values[step_range] < 0
-        neg = self.df['Open'].values[step_range] - \
-            self.df['Close'].values[step_range] > 0
+        pos = self.df['open'].values[step_range] - \
+            self.df['close'].values[step_range] < 0
+        neg = self.df['open'].values[step_range] - \
+            self.df['close'].values[step_range] > 0
 
         # Color volume bars based on price direction on that date
         self.volume_ax.bar(dates[pos], volume[pos], color=UP_COLOR,
@@ -135,8 +135,8 @@ class StockTradingGraph:
         for trade in trades:
             if trade['step'] in step_range:
                 date = date2num(self.df['Date'].values[trade['step']])
-                high = self.df['High'].values[trade['step']]
-                low = self.df['Low'].values[trade['step']]
+                high = self.df['high'].values[trade['step']]
+                low = self.df['low'].values[trade['step']]
 
                 if trade['type'] == 'buy':
                     high_low = low
@@ -148,7 +148,7 @@ class StockTradingGraph:
                 total = '{0:.2f}'.format(trade['total'])
 
                 # Print the current price to the price axis
-                self.price_ax.annotate(f'${total}', (date, high_low),
+                self.price_ax.annotate('${}'.format(total), (date, high_low),
                                        xytext=(date, high_low),
                                        color=color,
                                        fontsize=8,

@@ -27,10 +27,10 @@ class StockTradingEnv(gym.Env):
     metadata = {'render.modes': ['live', 'file', 'none']}
     visualization = None
 
-    def __init__(self, df):
-        super(StockTradingEnv, self).__init__()
+    def __init__(self, config):
+        # super(StockTradingEnv, self).__init__()
 
-        self.df = df
+        self.df = config['df']
         self.reward_range = (0, MAX_ACCOUNT_BALANCE)
 
         # Actions of the format Buy x%, Sell x%, Hold, etc.
@@ -39,7 +39,7 @@ class StockTradingEnv(gym.Env):
 
         # Prices contains the OHCL values for the last five prices
         self.observation_space = spaces.Box(
-            low=0, high=1, shape=(5, LOOKBACK_WINDOW_SIZE + 2), dtype=np.float16)
+            low=0, high=1, shape=(10, ), dtype=np.float16)
 
     # def _adjust_prices(self, df):
     #     # adjust_ratio = df['Adjusted_Close'] / df['Close']
@@ -52,10 +52,10 @@ class StockTradingEnv(gym.Env):
     #     return df
 
     def _next_observation(self):
-        frame = np.zeros((5, LOOKBACK_WINDOW_SIZE + 1))
+        frame = np.zeros(5)
 
         # Get the stock data points for the last 5 days and scale to between 0-1
-        np.put(frame, [0, 4], [
+        np.put(frame, 0, [
             self.df.loc[self.current_step: self.current_step +
                         LOOKBACK_WINDOW_SIZE, 'open'].values / MAX_SHARE_PRICE,
             self.df.loc[self.current_step: self.current_step +
@@ -75,7 +75,7 @@ class StockTradingEnv(gym.Env):
             [self.shares_held / MAX_NUM_SHARES],
             [self.cost_basis / MAX_SHARE_PRICE],
             [self.total_sales_value / (MAX_NUM_SHARES * MAX_SHARE_PRICE)],
-        ], axis=1)
+        ])
 
         return obs
 

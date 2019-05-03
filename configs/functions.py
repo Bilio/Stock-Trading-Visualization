@@ -125,7 +125,9 @@ def get_datasets(symbol, to_symbol, histo, limit):
     df.set_index('Date', inplace=True)
     train_size = round(len(df) * 0.5) # 50% to train -> test with different value
     df_train = df[:train_size]
+    df_train.name = symbol + to_symbol
     df_rollout = df[train_size:]
+    df_rollout.name = symbol + to_symbol
     df_train.to_csv('datasets/bot_train_{}_{}_{}.csv'.format(symbol + to_symbol, limit, histo))
     df_rollout.to_csv('datasets/bot_rollout_{}_{}_{}.csv'.format(symbol + to_symbol, limit, histo))
 

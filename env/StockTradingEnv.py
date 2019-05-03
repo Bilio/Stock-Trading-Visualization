@@ -39,7 +39,7 @@ class StockTradingEnv(gym.Env):
 
         # Prices contains the OHCL values for the last five prices
         self.observation_space = spaces.Box(
-            low=0, high=1, shape=(10, ), dtype=np.float16)
+            low=-np.finfo(np.float32).max, high=np.finfo(np.float32).max, shape=(17, ), dtype=np.float16)
 
     # def _adjust_prices(self, df):
     #     # adjust_ratio = df['Adjusted_Close'] / df['Close']
@@ -52,30 +52,36 @@ class StockTradingEnv(gym.Env):
     #     return df
 
     def _next_observation(self):
-        frame = np.zeros(5)
+        frame = np.zeros(12)
 
         # Get the stock data points for the last 5 days and scale to between 0-1
-        np.put(frame, 0, [
-            self.df.loc[self.current_step: self.current_step +
-                        LOOKBACK_WINDOW_SIZE, 'open'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        LOOKBACK_WINDOW_SIZE, 'high'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        LOOKBACK_WINDOW_SIZE, 'low'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        LOOKBACK_WINDOW_SIZE, 'close'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        LOOKBACK_WINDOW_SIZE, 'volumefrom'].values / MAX_NUM_SHARES,
+        # CRITICAL POINT HERE
+        # =================
+        np.put(frame, [0,1,2,3,4,5,6,7,8.9,10,11], [
+            self.df.loc[self.current_step: self.current_step + 1, 'open'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'high'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'low'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'close'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'volumefrom'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'MOM'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'RSI'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'HT_DCPERIOD'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'EMA'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'WILLR'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'BBANDS_upper'].values,
+            self.df.loc[self.current_step: self.current_step + 1, 'PPO'].values,
         ])
 
         # Append additional data and scale each value to between 0-1
         obs = np.append(frame, [
-            [self.balance / MAX_ACCOUNT_BALANCE],
-            [self.max_net_worth / MAX_ACCOUNT_BALANCE],
-            [self.shares_held / MAX_NUM_SHARES],
-            [self.cost_basis / MAX_SHARE_PRICE],
-            [self.total_sales_value / (MAX_NUM_SHARES * MAX_SHARE_PRICE)],
+            [self.balance],
+            [self.max_net_worth],
+            [self.shares_held],
+            [self.cost_basis],
+            [self.total_sales_value],
         ])
+        # print(obs)
+
 
         return obs
 
@@ -175,8 +181,7 @@ class StockTradingEnv(gym.Env):
 
         elif mode == 'live':
             if self.visualization == None:
-                self.visualization = StockTradingGraph(
-                    self.df, kwargs.get('title', None))
+                self.visualization = StockTradingGraph(self.df)
 
             # if self.current_step > LOOKBACK_WINDOW_SIZE:
             self.visualization.render(

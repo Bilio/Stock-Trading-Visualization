@@ -31,22 +31,15 @@ class StockTradingEnv(gym.Env):
         # super(StockTradingEnv, self).__init__()
 
         self.df = config['df']
-        self.render_title = config['render_title']
-        # self.reward_range = (0, MAX_ACCOUNT_BALANCE)
-        self.lookback_window_size = 40
-        self.initial_balance = INITIAL_ACCOUNT_BALANCE
-        self.commission = 0.00075
-        self.serial = False
+        self.reward_range = (0, MAX_ACCOUNT_BALANCE)
 
         # Actions of the format Buy x%, Sell x%, Hold, etc.
-        # self.action_space = spaces.MultiDiscrete([3, 10])
-
         self.action_space = spaces.Box(
             low=np.array([0, 0]), high=np.array([3, 1]), dtype=np.float16)
 
         # Prices contains the OHCL values for the last five prices
         self.observation_space = spaces.Box(
-            low=-np.finfo(np.float32).max, high=np.finfo(np.float32).max, shape=(18, ), dtype=np.float16)
+            low=-np.finfo(np.float32).max, high=np.finfo(np.float32).max, shape=(17, ), dtype=np.float16)
 
     # def _adjust_prices(self, df):
     #     # adjust_ratio = df['Adjusted_Close'] / df['Close']
@@ -79,15 +72,16 @@ class StockTradingEnv(gym.Env):
             self.df.loc[self.current_step: self.current_step + 1, 'PPO'].values,
         ])
 
+        # Append additional data and scale each value to between 0-1
         obs = np.append(frame, [
             [self.balance],
-            [self.btc_bought],
-            [self.btc_sold],
-            [self.cost],
-            [self.sales],
-            [self.net_worth]
+            [self.max_net_worth],
+            [self.shares_held],
+            [self.cost_basis],
+            [self.total_sales_value],
         ])
         # print(obs)
+
 
         return obs
 
@@ -97,40 +91,44 @@ class StockTradingEnv(gym.Env):
 
         action_type = action[0]
         amount = action[1]
-        # print('amount', amount)
-
-        self.btc_bought = 0
-        self.btc_sold = 0
-        self.cost = 0
-        self.sales = 0
 
         if action_type < 1:
+            # Buy amount % of balance in shares
+            total_possible = int(self.balance / current_price)
+            shares_bought = int(total_possible * amount)
+            prev_cost = self.cost_basis * self.shares_held
+            additional_cost = shares_bought * current_price
 
-            self.btc_bought = self.balance * current_price * amount
-            self.cost = self.btc_bought * current_price * (1 + self.commission)
-            self.btc_held += self.btc_bought
-            self.balance -= self.cost
-            # print('btc_bought',self.btc_bought)
-            # print('balance',self.balance)
+            self.balance -= additional_cost
+            self.cost_basis = (
+                prev_cost + additional_cost) / (self.shares_held + shares_bought)
+            self.shares_held += shares_bought
 
-
+            if shares_bought > 0:
+                self.trades.append({'step': self.current_step,
+                                    'shares': shares_bought, 'total': additional_cost,
+                                    'type': "buy"})
 
         elif action_type < 2:
+            # Sell amount % of shares held
+            shares_sold = int(self.shares_held * amount)
+            self.balance += shares_sold * current_price
+            self.shares_held -= shares_sold
+            self.total_shares_sold += shares_sold
+            self.total_sales_value += shares_sold * current_price
 
-            self.btc_sold = self.btc_held * amount
-            self.sales = self.btc_sold * current_price * (1 - self.commission)
-            self.btc_held -= self.btc_sold
-            self.balance += self.sales
-            # print('btc_held',self.btc_held)
-            # print('balance on sold',self.balance)
+            if shares_sold > 0:
+                self.trades.append({'step': self.current_step,
+                                    'shares': shares_sold, 'total': shares_sold * current_price,
+                                    'type': "sell"})
 
-        if self.btc_sold > 0 or self.btc_bought > 0:
-            self.trades.append({'step': self.current_step,
-                                'amount': self.btc_sold if self.btc_sold > 0 else self.btc_bought, 'total': self.sales if self.btc_sold > 0 else self.cost,
-                                'type': "sell" if self.btc_sold > 0 else "buy"})
+        self.net_worth = self.balance + self.shares_held * current_price
 
-        self.net_worth = self.balance + self.btc_held * current_price
-        self.buy_and_hold = self.initial_bought * current_price
+        if self.net_worth > self.max_net_worth:
+            self.max_net_worth = self.net_worth
+
+        if self.shares_held == 0:
+            self.cost_basis = 0
 
     def step(self, action):
         # Execute one time step within the environment
@@ -138,12 +136,10 @@ class StockTradingEnv(gym.Env):
 
         self.current_step += 1
 
-        # delay_modifier = (self.current_step / MAX_STEPS)
+        delay_modifier = (self.current_step / MAX_STEPS)
 
-        # reward = self.balance * delay_modifier + self.current_step
-        net_worth_and_buyhold_mean = (self.net_worth + self.buy_and_hold) / 2
-        reward = (self.net_worth - self.buy_and_hold) / net_worth_and_buyhold_mean
-        done = self.net_worth <= 0 or  self.balance <= 0 or self.current_step >= len(
+        reward = self.balance * delay_modifier + self.current_step
+        done = self.net_worth <= 0 or self.current_step >= len(
             self.df.loc[:, 'open'].values)
 
         obs = self._next_observation()
@@ -154,15 +150,12 @@ class StockTradingEnv(gym.Env):
         # Reset the state of the environment to an initial state
         self.balance = INITIAL_ACCOUNT_BALANCE
         self.net_worth = INITIAL_ACCOUNT_BALANCE
-        self.btc_held = 0
-        self.btc_bought = 0
-        self.btc_sold = 0
-        self.cost = 0
-        self.sales = 0
+        self.max_net_worth = INITIAL_ACCOUNT_BALANCE
+        self.shares_held = 0
+        self.cost_basis = 0
+        self.total_shares_sold = 0
+        self.total_sales_value = 0
         self.current_step = 0
-        self.first_price = self.df.loc[0, "close"]
-
-        self.initial_bought = self.initial_balance / self.first_price
         self.trades = []
 
         return self._next_observation()
@@ -174,9 +167,9 @@ class StockTradingEnv(gym.Env):
 
         file.write('Step: {}\n'.format(self.current_step))
         file.write('Balance: {}\n'.format(self.balance))
-        # file.write('Shares held: {} (Total sold: {})\n'.format(self.shares_held, self.total_shares_sold))
-        # file.write('Avg cost for held shares: {} (Total sales value: {})\n'.format(self.cost_basis, self.total_sales_value))
-        # file.write('Net worth: {} (Max net worth: {})\n'.format(self.net_worth, self.max_net_worth))
+        file.write('Shares held: {} (Total sold: {})\n'.format(self.shares_held, self.total_shares_sold))
+        file.write('Avg cost for held shares: {} (Total sales value: {})\n'.format(self.cost_basis, self.total_sales_value))
+        file.write('Net worth: {} (Max net worth: {})\n'.format(self.net_worth, self.max_net_worth))
         file.write('Profit: {}\n\n'.format(profit))
 
         file.close()
@@ -188,11 +181,11 @@ class StockTradingEnv(gym.Env):
 
         elif mode == 'live':
             if self.visualization == None:
-                self.visualization = StockTradingGraph(self.df, self.render_title)
+                self.visualization = StockTradingGraph(self.df)
 
-            if self.current_step > LOOKBACK_WINDOW_SIZE:
-                self.visualization.render(
-                self.current_step, self.net_worth, self.buy_and_hold, self.trades, window_size=LOOKBACK_WINDOW_SIZE)
+            # if self.current_step > LOOKBACK_WINDOW_SIZE:
+            self.visualization.render(
+                self.current_step, self.net_worth, self.trades, window_size=LOOKBACK_WINDOW_SIZE)
 
     def close(self):
         if self.visualization != None:

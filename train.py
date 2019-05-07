@@ -20,25 +20,24 @@ if __name__ == "__main__":
     df = pd.read_csv('./datasets/bot_train_ETHUSDT_600_hour.csv')
     # df = pd.read_csv('./datasets/bot_train_ETHBTC_700_day.csv')
     df = df.sort_values('Date')
-    register_env("StockTradingEnv-test", lambda config: StockTradingEnv(config))
+    register_env("StockTradingEnv-v1", lambda config: StockTradingEnv(config))
     ray.init()
     run_experiments({
-        "ETHUSDT_600_hour2": {
+        "ETHUSDT_600_hour": {
             "run": "PPO",
-            "env": "StockTradingEnv-test",
+            "env": "StockTradingEnv-v1",
             "stop": {
                 "timesteps_total": 1.2e6, #1e6 = 1M
             },
-            "checkpoint_freq": 100,
+            "checkpoint_freq": 25,
             "checkpoint_at_end": True,
             "config": {
                 "lr": grid_search([
-                    # 8e-6,
-                    5e-5
+                    6.5e-5
                 ]),
                 "num_workers": 3,  # parallelism
                 'observation_filter': 'MeanStdFilter',
-                # "vf_clip_param": 10000000000.0, # used to trade large rewarded with PPO
+                # "vf_clip_param": 100000.0, # used to trade large rewarded with PPO
                 "env_config": {
                     'df': df,
                     'render_title': ''

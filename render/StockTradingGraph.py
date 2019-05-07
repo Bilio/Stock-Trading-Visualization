@@ -158,7 +158,7 @@ class StockTradingGraph:
                     high_low = high
                     color = DOWN_TEXT_COLOR
 
-                total = '{0:.2f}'.format(trade['total'])
+                total = '{0:.5f}'.format(trade['total'])
 
                 # Print the current price to the price axis
                 self.price_ax.annotate('${}'.format(total), (date, high_low),

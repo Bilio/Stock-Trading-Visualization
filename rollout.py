@@ -232,5 +232,5 @@ if __name__ == "__main__":
         "df": df,
         "render_title": "ETHUSDT"
     }
-    register_env("StockTradingEnv-test", lambda _: StockTradingEnv(config))
+    register_env("StockTradingEnv-v1", lambda _: StockTradingEnv(config))
     run(args, parser, df)

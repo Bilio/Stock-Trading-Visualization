@@ -28,13 +28,16 @@ def date2num(date):
 class StockTradingGraph:
     """A stock trading visualization using matplotlib made to render OpenAI gym environments"""
 
-    def __init__(self, df, title=None):
+    def __init__(self, df, render_title):
         self.df = df
+        self.render_title = render_title
         self.net_worths = np.zeros(len(df['Date']))
+        self.buy_and_holds = np.zeros(len(df['Date']))
 
         # Create a figure on screen and set the title
         fig = plt.figure()
-        fig.suptitle(title)
+        # fig.suptitle('ETHBTC')
+        fig.suptitle(self.render_title)
 
         # Create top subplot for net worth axis
         self.net_worth_ax = plt.subplot2grid(
@@ -54,14 +57,15 @@ class StockTradingGraph:
         # Show the graph without blocking the rest of the program
         plt.show(block=False)
 
-    def _render_net_worth(self, current_step, net_worth, step_range, dates):
+    def _render_net_worth(self, current_step, net_worth, buy_and_hold, step_range, dates):
         # Clear the frame rendered last step
         self.net_worth_ax.clear()
 
         # Plot net worths
         self.net_worth_ax.plot_date(
-            dates, self.net_worths[step_range], '-', label='Net Worth')
-
+            dates, self.net_worths[step_range], '-', label='Bot')
+        self.net_worth_ax.plot_date(
+            dates, self.buy_and_holds[step_range], '-', label='Buy and Hold')
         # Show legend, which uses the label we defined for the plot above
         self.net_worth_ax.legend()
         legend = self.net_worth_ax.legend(loc=2, ncol=2, prop={'size': 8})
@@ -69,6 +73,7 @@ class StockTradingGraph:
 
         last_date = date2num(self.df['Date'].values[current_step])
         last_net_worth = self.net_worths[current_step]
+        last_buy_and_hold = self.buy_and_holds[current_step]
 
         # Annotate the current net worth on the net worth graph
         self.net_worth_ax.annotate('{0:.2f}'.format(net_worth), (last_date, last_net_worth),
@@ -77,10 +82,18 @@ class StockTradingGraph:
                                              fc='w', ec='k', lw=1),
                                    color="black",
                                    fontsize="small")
+        self.net_worth_ax.annotate('{0:.2f}'.format(buy_and_hold), (last_date, last_buy_and_hold),
+                                   xytext=(last_date, last_buy_and_hold),
+                                   bbox=dict(boxstyle='round',
+                                             fc='w', ec='k', lw=1),
+                                   color="black",
+                                   fontsize="small")
 
         # Add space above and below min/max net worth
-        self.net_worth_ax.set_ylim(
-            min(self.net_worths[np.nonzero(self.net_worths)]) / 1.25, max(self.net_worths) * 1.25)
+        # self.net_worth_ax.set_ylim(
+        #     min(self.net_worths[np.nonzero(self.net_worths)]) / 1.25, max(self.net_worths) * 1.25)
+        # self.net_worth_ax.set_ylim(
+        #     min(self.buy_and_holds[np.nonzero(self.buy_and_holds)]) / 1.25, max(self.net_worths) * 1.25)
 
     def _render_price(self, current_step, net_worth, dates, step_range):
         self.price_ax.clear()
@@ -91,7 +104,7 @@ class StockTradingGraph:
                            self.df['high'].values[step_range], self.df['low'].values[step_range])
 
         # Plot price using candlestick graph from mpl_finance
-        candlestick(self.price_ax, candlesticks, width=1,
+        candlestick(self.price_ax, candlesticks, width=.04,
                     colorup=UP_COLOR, colordown=DOWN_COLOR)
 
         last_date = date2num(self.df['Date'].values[current_step])
@@ -99,7 +112,7 @@ class StockTradingGraph:
         last_high = self.df['high'].values[current_step]
 
         # Print the current price to the price axis
-        self.price_ax.annotate('{0:.2f}'.format(last_close), (last_date, last_close),
+        self.price_ax.annotate('{0:.4f}'.format(last_close), (last_date, last_close),
                                xytext=(last_date, last_high),
                                bbox=dict(boxstyle='round',
                                          fc='w', ec='k', lw=1),
@@ -123,9 +136,9 @@ class StockTradingGraph:
 
         # Color volume bars based on price direction on that date
         self.volume_ax.bar(dates[pos], volume[pos], color=UP_COLOR,
-                           alpha=0.4, width=1, align='center')
+                           alpha=0.4, width=.04, align='center')
         self.volume_ax.bar(dates[neg], volume[neg], color=DOWN_COLOR,
-                           alpha=0.4, width=1, align='center')
+                           alpha=0.4, width=.04, align='center')
 
         # Cap volume axis height below price chart and hide ticks
         self.volume_ax.set_ylim(0, max(volume) / VOLUME_CHART_HEIGHT)
@@ -154,8 +167,9 @@ class StockTradingGraph:
                                        fontsize=8,
                                        arrowprops=(dict(color=color)))
 
-    def render(self, current_step, net_worth, trades, window_size=40):
+    def render(self, current_step, net_worth, buy_and_hold, trades, window_size):
         self.net_worths[current_step] = net_worth
+        self.buy_and_holds[current_step] = buy_and_hold
 
         window_start = max(current_step - window_size, 0)
         step_range = range(window_start, current_step + 1)
@@ -164,7 +178,7 @@ class StockTradingGraph:
         dates = np.array([date2num(x)
                           for x in self.df['Date'].values[step_range]])
 
-        self._render_net_worth(current_step, net_worth, step_range, dates)
+        self._render_net_worth(current_step, net_worth, buy_and_hold, step_range, dates)
         self._render_price(current_step, net_worth, dates, step_range)
         self._render_volume(current_step, net_worth, dates, step_range)
         self._render_trades(current_step, trades, step_range)

@@ -47,6 +47,7 @@ def get_datasets(symbol, to_symbol, histo, limit):
     result = json_response['Data']
     df = pd.DataFrame(result)
     df['Date'] = pd.to_datetime(df['time'], utc=True, unit='s')
+    # df['Date'] = df['time']
     df.drop('time', axis=1, inplace=True)
 
     # indicators

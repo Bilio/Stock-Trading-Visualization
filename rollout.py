@@ -226,10 +226,11 @@ def rollout(agent, env_name, num_steps, out=None, no_render=True):
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    df = pd.read_csv('./datasets/bot_rollout_ETHBTC_700_day.csv')
-    # config_function = lambda _: TradingEnv(config)
+    df = pd.read_csv('./datasets/bot_rollout_ETHUSDT_600_hour.csv')
+    # df = pd.read_csv('./datasets/bot_rollout_ETHUSDT_600_hour.csv')
     config = {
-        "df": df
+        "df": df,
+        "render_title": "ETHUSDT"
     }
     register_env("StockTradingEnv-test", lambda _: StockTradingEnv(config))
     run(args, parser, df)
